@@ -1,0 +1,11 @@
+{
+    "domain": "dgus",
+    "name": "DGUS integration",
+    "documentation": "https://github.com/nukevoid/dgus_hass_connection",
+    "issue_tracker": "https://github.com/nukevoid/dgus_hass_connection/issues",
+    "dependencies": [],
+    "after_dependencies": [],
+    "codeowners": ["@nukevoid"],
+    "requirements": ["pyserial==3.5"],
+    "quality_scale": "silver"
+  }
