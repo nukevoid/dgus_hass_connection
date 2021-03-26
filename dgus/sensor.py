@@ -1,4 +1,4 @@
-from const import (
+from .const import (
     DOMAIN,
     CONF_SCREENS
 )
@@ -10,6 +10,8 @@ from homeassistant.helpers.typing import (
     HomeAssistantType,
 )
 
+import serial
+
 async def async_setup_platform(
     hass: HomeAssistantType,
     config: ConfigType,
@@ -20,7 +22,7 @@ async def async_setup_platform(
     async_add_entities(sensors, update_before_add=True)
 
 class DGUSSensor(Entity):
-     def __init__(self, screen):
+    def __init__(self, screen):
         self._state = None
 
     @property
