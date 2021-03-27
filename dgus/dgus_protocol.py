@@ -70,17 +70,17 @@ class DgusProtocol(serial.threaded.Protocol):
         self._transport.serial.flush()
 
 
-def StartSerial(port_name, baudrate, callback):
+def create(port_name, baudrate, callback):
     ser = serial.Serial(port_name, baudrate)
     proto = serial.threaded.ReaderThread(ser, lambda:DgusProtocol(result))
     proto.start()
     return proto
 
+    
+
 if __name__ == "__main__":
     num = 0x0
-
     p = None
-
     def result(vp, value):
         if value != 0:
             print(vp, value)

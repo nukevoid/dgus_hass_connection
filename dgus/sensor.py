@@ -9,8 +9,9 @@ from homeassistant.helpers.typing import (
     DiscoveryInfoType,
     HomeAssistantType,
 )
-
-import serial
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_state_change
+import dgus_protocol
 
 async def async_setup_platform(
     hass: HomeAssistantType,
@@ -18,21 +19,52 @@ async def async_setup_platform(
     async_add_entities: Callable,
     discovery_info: Optional[DiscoveryInfoType] = None,
 ) -> None:
-    sensors = [DGUSSensor(screen) for screen in config[CONF_SCREENS]]
+    sensors = [DGUSSensor(hass, screen) for screen in config[CONF_SCREENS]]
     async_add_entities(sensors, update_before_add=True)
 
-class DGUSSensor(Entity):
-    def __init__(self, screen):
-        self._state = None
 
+class StateConverters:
+    @staticmethod
+    def int(entry, protocol):
+        vp = entry['vp']
+        return lambda state: protocol.write_vp(vp, int(state))
+
+    @staticmethod 
+    def map(entry, protocol):
+        vp = entry['vp']
+        map_state = entry['map']
+        return lambda state: protocol.write_vp(vp, map_state[state])
+
+
+class DGUSSensor(Entity):
+    def __init__(self, hass, screen):
+        self._hass = hass
+        self._name = screen['name']
+        self._protocol = dgus_protocol.create(screen['port_name'], screen['bound_rate'], self.on_data)
+        self._state = None
+        self._entities_track_handlers = dict()
+        for entry in screen['show_states']:
+            converter = getattr(StateConverters, entry['type'])
+            self._entities_track_handlers[entry['entity_id']] = converter(entry, self._protocol.protocol)
+
+        entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
+        async_track_state_change(hass, entiti_ids, self.state_listener)
+
+    def state_listener(self, entity, old_state, new_state):
+        self._entities_track_handlers[entity](new_state)
+        
     @property
     def name(self):
-        return 'DGUS screen'
+        return self._name
 
     @property
     def state(self):
         return self._state
 
+    def on_data(self, vp, value):
+        eventName = self.name + "_set_vp"
+        self._hass.bus.fire(eventName, {"vp": vp, "value": value})
+        print(vp, value)
+
     def update(self):
         pass
-        #self._state = self.hass.data[DOMAIN]['temperature']
