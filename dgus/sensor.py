@@ -1,3 +1,4 @@
+import logging
 from .const import (
     DOMAIN,
     CONF_SCREENS
@@ -11,7 +12,9 @@ from homeassistant.helpers.typing import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change
-import dgus_protocol
+from .dgus_protocol import create_protocol
+
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(
     hass: HomeAssistantType,
@@ -38,17 +41,23 @@ class StateConverters:
 
 class DGUSSensor(Entity):
     def __init__(self, hass, screen):
+        self._state = None
         self._hass = hass
         self._name = screen['name']
-        self._protocol = dgus_protocol.create(screen['port_name'], screen['bound_rate'], self.on_data)
-        self._state = None
         self._entities_track_handlers = dict()
-        for entry in screen['show_states']:
-            converter = getattr(StateConverters, entry['type'])
-            self._entities_track_handlers[entry['entity_id']] = converter(entry, self._protocol.protocol)
+        try:
+            self._protocol = create_protocol(screen['port_name'], screen['bound_rate'], self.on_data)
+        except:
+            _LOGGER.error("Cant open serial port %s", screen['port_name'])
+            return 
+        
+        if 'show_states' in screen:
+            for entry in screen['show_states']:
+                converter = getattr(StateConverters, entry['type'])
+                self._entities_track_handlers[entry['entity_id']] = converter(entry, self._protocol.protocol)
 
-        entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
-        async_track_state_change(hass, entiti_ids, self.state_listener)
+            entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
+            async_track_state_change(hass, entiti_ids, self.state_listener)
 
     def state_listener(self, entity, old_state, new_state):
         self._entities_track_handlers[entity](new_state)
