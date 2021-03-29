@@ -61,8 +61,8 @@ class DGUSSensor(Entity):
         self._state_track_settings = {entry['entity_id']:entry for entry in screen.get('show_states',[])}
         try:
             self._protocol = create_protocol(screen['port_name'], screen['bound_rate'], self.on_data)
-        except Exception:
-            _LOGGER.error("Can't open serial port %s", screen['port_name'])
+        except Exception as er:
+            _LOGGER.error("Can't open serial port %s, : %s", screen['port_name'], str(er))
             return 
         
         entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
