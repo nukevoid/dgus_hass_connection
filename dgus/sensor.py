@@ -16,13 +16,14 @@ from .dgus_protocol import create_protocol
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_platform(
     hass: HomeAssistantType,
     config: ConfigType,
     async_add_entities: Callable,
     discovery_info: Optional[DiscoveryInfoType] = None,
 ) -> None:
-    sensors = [DGUSSensor(hass, screen) for screen in config[CONF_SCREENS]]
+    sensors = [DGUSScreen(hass, screen) for screen in config[CONF_SCREENS]]
     async_add_entities(sensors, update_before_add=True)
 
 
@@ -42,9 +43,9 @@ class StateConverters:
             value = int(float(StateConverters.extract_attr(state, attr)))
             protocol.write_vp(vp, value)
         except Exception as er:
-             _LOGGER.error("Can't send value: %s", str(er))
+            _LOGGER.error("Can't send value: %s", str(er))
 
-    @staticmethod 
+    @staticmethod
     def send_map(state, settings, protocol):
         vp = settings['vp']
         map_state = settings['map']
@@ -53,28 +54,32 @@ class StateConverters:
         protocol.write_vp(vp, value)
 
 
-class DGUSSensor(Entity):
+class DGUSScreen(Entity):
     def __init__(self, hass, screen):
         self._state = None
         self._hass = hass
         self._name = screen['name']
-        self._state_track_settings = {entry['entity_id']:entry for entry in screen.get('show_states',[])}
+        self._state_track_settings = {
+            entry['entity_id']: entry for entry in screen.get('show_states', [])}
         try:
-            self._protocol = create_protocol(screen['port_name'], screen['bound_rate'], self.on_data)
+            self._protocol = create_protocol(
+                screen['port_name'], screen['bound_rate'], self.on_data)
         except Exception as er:
-            _LOGGER.error("Can't open serial port %s, : %s", screen['port_name'], str(er))
-            return 
-        
+            _LOGGER.error("Can't open serial port %s, : %s",
+                          screen['port_name'], str(er))
+            
         entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
         async_track_state_change(hass, entiti_ids, self.state_listener)
 
     def state_listener(self, entity, old_state, new_state):
         settings = self._state_track_settings[entity]
         if settings['type'] == 'int':
-            StateConverters.send_int(new_state, settings, self._protocol.protocol)
+            StateConverters.send_int(
+                new_state, settings, self._protocol.protocol)
         elif settings['type'] == 'map':
-            StateConverters.send_map(new_state, settings, self._protocol.protocol)
-        
+            StateConverters.send_map(
+                new_state, settings, self._protocol.protocol)
+
     @property
     def name(self):
         return self._name
@@ -84,8 +89,6 @@ class DGUSSensor(Entity):
         return self._state
 
     def on_data(self, vp, value):
+        """fire event for data, received from screen"""
         eventName = self.name + "_set_vp"
         self._hass.bus.fire(eventName, {"vp": vp, "value": value})
-
-    def update(self):
-        pass

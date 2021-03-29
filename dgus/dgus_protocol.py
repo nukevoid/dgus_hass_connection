@@ -1,9 +1,11 @@
 import serial
-import struct 
+import struct
 import serial.threaded
-import time 
+import time
+
 
 class DgusProtocol(serial.threaded.Protocol):
+    """Connection to the DGUS screens, implements DGUS data protocol"""
     START_1 = b'\x5a'
     START_2 = b'\xa5'
     PENDING_START_1 = 0
@@ -35,7 +37,7 @@ class DgusProtocol(serial.threaded.Protocol):
         if cmd == DgusProtocol.READ_VP_CMD:
             vp, _, value = struct.unpack_from('>hbh', msg, 1)
             self._callback(vp, value)
-            
+
     def data_received(self, data):
         for byte in serial.iterbytes(data):
             if self._state == DgusProtocol.PENDING_START_1 and byte == DgusProtocol.START_1:
@@ -61,7 +63,6 @@ class DgusProtocol(serial.threaded.Protocol):
         message = struct.pack('>iHb', HEADER, vp, WORDS_TO_READ)
         self._transport.write(message)
         self._transport.serial.flush()
-        
 
     def write_vp(self, vp, value):
         HEADER = 0x5aa50582
@@ -72,15 +73,15 @@ class DgusProtocol(serial.threaded.Protocol):
 
 def create_protocol(port_name, baudrate, callback):
     ser = serial.Serial(port_name, baudrate)
-    proto = serial.threaded.ReaderThread(ser, lambda:DgusProtocol(callback))
+    proto = serial.threaded.ReaderThread(ser, lambda: DgusProtocol(callback))
     proto.start()
     return proto
 
-    
 
 if __name__ == "__main__":
     num = 0x0
     p = None
+
     def result(vp, value):
         if value != 0:
             print(vp, value)
