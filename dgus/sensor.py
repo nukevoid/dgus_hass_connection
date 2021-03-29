@@ -28,15 +28,29 @@ async def async_setup_platform(
 
 class StateConverters:
     @staticmethod
-    def int(entry, protocol):
-        vp = entry['vp']
-        return lambda state: protocol.write_vp(vp, int(state))
+    def extract_attr(state, attr):
+        if attr:
+            return state.attributes[attr]
+        else:
+            return state.as_dict()['state']
+
+    @staticmethod
+    def send_int(state, settings, protocol):
+        vp = settings['vp']
+        attr = settings.get('attribute', None)
+        try:
+            value = int(float(StateConverters.extract_attr(state, attr)))
+            protocol.write_vp(vp, value)
+        except Exception as er:
+             _LOGGER.error("Can't send value: %s", str(er))
 
     @staticmethod 
-    def map(entry, protocol):
-        vp = entry['vp']
-        map_state = entry['map']
-        return lambda state: protocol.write_vp(vp, map_state[state])
+    def send_map(state, settings, protocol):
+        vp = settings['vp']
+        map_state = settings['map']
+        attr = settings.get('attribute', None)
+        value = map_state[StateConverters.extract_attr(state, attr)]
+        protocol.write_vp(vp, value)
 
 
 class DGUSSensor(Entity):
@@ -44,23 +58,22 @@ class DGUSSensor(Entity):
         self._state = None
         self._hass = hass
         self._name = screen['name']
-        self._entities_track_handlers = dict()
+        self._state_track_settings = {entry['entity_id']:entry for entry in screen.get('show_states',[])}
         try:
             self._protocol = create_protocol(screen['port_name'], screen['bound_rate'], self.on_data)
-        except:
-            _LOGGER.error("Cant open serial port %s", screen['port_name'])
+        except Exception:
+            _LOGGER.error("Can't open serial port %s", screen['port_name'])
             return 
         
-        if 'show_states' in screen:
-            for entry in screen['show_states']:
-                converter = getattr(StateConverters, entry['type'])
-                self._entities_track_handlers[entry['entity_id']] = converter(entry, self._protocol.protocol)
-
-            entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
-            async_track_state_change(hass, entiti_ids, self.state_listener)
+        entiti_ids = [entry['entity_id'] for entry in screen['show_states']]
+        async_track_state_change(hass, entiti_ids, self.state_listener)
 
     def state_listener(self, entity, old_state, new_state):
-        self._entities_track_handlers[entity](new_state)
+        settings = self._state_track_settings[entity]
+        if settings['type'] == 'int':
+            StateConverters.send_int(new_state, settings, self._protocol.protocol)
+        elif settings['type'] == 'map':
+            StateConverters.send_map(new_state, settings, self._protocol.protocol)
         
     @property
     def name(self):
@@ -73,7 +86,6 @@ class DGUSSensor(Entity):
     def on_data(self, vp, value):
         eventName = self.name + "_set_vp"
         self._hass.bus.fire(eventName, {"vp": vp, "value": value})
-        print(vp, value)
 
     def update(self):
         pass

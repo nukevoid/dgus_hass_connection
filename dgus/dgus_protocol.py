@@ -72,7 +72,7 @@ class DgusProtocol(serial.threaded.Protocol):
 
 def create_protocol(port_name, baudrate, callback):
     ser = serial.Serial(port_name, baudrate)
-    proto = serial.threaded.ReaderThread(ser, lambda:DgusProtocol(result))
+    proto = serial.threaded.ReaderThread(ser, lambda:DgusProtocol(callback))
     proto.start()
     return proto
 
