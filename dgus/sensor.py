@@ -50,7 +50,8 @@ class StateConverters:
         vp = settings['vp']
         map_state = settings['map']
         attr = settings.get('attribute', None)
-        value = map_state[StateConverters.extract_attr(state, attr)]
+        key = str(StateConverters.extract_attr(state, attr))
+        value = int(map_state[key])
         protocol.write_vp(vp, value)
 
 
